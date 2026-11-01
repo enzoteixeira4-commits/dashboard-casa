@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Dashboard da Casa</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ical.js/1.5.0/ical.min.js"></script>
+  <style>
+    :root {
+      --bg: radial-gradient(circle at top left, #0f172a, #020617);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.08);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --enzo: #10b981;
+      --mariana: #ec4899;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 24px 32px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .clock { font-size: 3.8rem; font-weight: 700; letter-spacing: -1.5px; line-height: 1; }
+    .date { font-size: 1.2rem; color: var(--text-muted); font-weight: 500; text-transform: capitalize; margin-top: 6px; }
+    .controls { display: flex; align-items: center; gap: 14px; }
+    .badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+    .badge-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .btn-icon {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 10px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1rem;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr;
+      gap: 20px;
+      flex: 1;
+      min-height: 0;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      backdrop-filter: blur(20px);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .events-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      overflow-y: auto;
+      padding-right: 4px;
+      flex: 1;
+    }
+    .event-card {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 16px;
+      border-left: 4px solid var(--enzo);
+    }
+    .event-card.mariana { border-left-color: var(--mariana); }
+    .event-time { font-size: 0.95rem; font-weight: 700; min-width: 95px; }
+    .event-details { flex: 1; }
+    .event-title { font-size: 1.05rem; font-weight: 600; }
+    .event-sub { font-size: 0.85rem; color: var(--text-muted); margin-top: 2px; }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.8);
+      backdrop-filter: blur(10px);
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-box {
+      background: #1e293b;
+      padding: 28px;
+      border-radius: 20px;
+      width: 90%;
+      max-width: 520px;
+      border: 1px solid var(--card-border);
+    }
+    .modal-box h3 { margin-bottom: 16px; font-size: 1.25rem; }
+    .modal-box label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 6px; }
+    .modal-box input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--card-border);
+      color: #fff;
+      margin-bottom: 14px;
+      font-size: 0.85rem;
+    }
+    .modal-box button {
+      padding: 10px 18px;
+      background: var(--enzo);
+      border: none;
+      border-radius: 10px;
+      color: #000;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .status-msg { font-size: 0.85rem; color: var(--text-muted); margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="clock" id="clock">--:--</div>
+      <div class="date" id="date">--</div>
+    </div>
+    <div class="controls">
+      <div class="badge"><div class="badge-dot" style="background: var(--enzo)"></div> Enzo</div>
+      <div class="badge"><div class="badge-dot" style="background: var(--mariana)"></div> Mariana</div>
+      <button class="btn-icon" onclick="fetchEvents()" title="Atualizar">🔄</button>
+      <button class="btn-icon" onclick="openConfig()" title="Definições">⚙️</button>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <div class="card-title">
+        <span>Próximos Eventos</span>
+        <span id="sync-status" style="font-size:0.75rem; color:var(--text-muted); font-weight:normal;"></span>
+      </div>
+      <div class="events-list" id="eventList">
+        <div style="color: var(--text-muted); font-size: 0.95rem;">A carregar eventos...</div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Informações & Estado</div>
+      <div id="debug-box" style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6;">
+        A inicializar ligação aos calendários...
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="configModal">
+    <div class="modal-box">
+      <h3>Configurar Links iCal</h3>
+      <label>Link iCal do Google (Enzo):</label>
+      <input type="text" id="enzoUrl" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+      
+      <label>Link iCal do iCloud (Mariana):</label>
+      <input type="text" id="marianaUrl" placeholder="https://p01-caldav.icloud.com/...">
+      
+      <div style="display:flex; justify-content: flex-end; gap: 10px;">
+        <button style="background: transparent; color: #fff; border: 1px solid var(--card-border);" onclick="closeConfig()">Cancelar</button>
+        <button onclick="saveConfig()">Guardar e Sincronizar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent = now.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('date').textContent = now.toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function openConfig() {
+      document.getElementById('enzoUrl').value = localStorage.getItem('cal_enzo') || '';
+      document.getElementById('marianaUrl').value = localStorage.getItem('cal_mariana') || '';
+      document.getElementById('configModal').style.display = 'flex';
+    }
+    function closeConfig() {
+      document.getElementById('configModal').style.display = 'none';
+    }
+    function saveConfig() {
+      let enzo = document.getElementById('enzoUrl').value.trim();
+      let mariana = document.getElementById('marianaUrl').value.trim();
+      
+      if (mariana.startsWith('webcal://')) mariana = mariana.replace('webcal://', 'https://');
+      if (enzo.startsWith('webcal://')) enzo = enzo.replace('webcal://', 'https://');
+
+      localStorage.setItem('cal_enzo', enzo);
+      localStorage.setItem('cal_mariana', mariana);
+      closeConfig();
+      fetchEvents();
+    }
+
+    async function fetchCalendar(url) {
+      if (!url) return null;
+      // Lista de proxies de contingência contra bloqueios CORS
+      const proxies = [
+        `https://corsproxy.io/?${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`
+      ];
+
+      for (let proxyUrl of proxies) {
+        try {
+          const res = await fetch(proxyUrl);
+          if (res.ok) {
+            const text = await res.text();
+            if (text.includes("BEGIN:VCALENDAR")) return text;
+          }
+        } catch (e) {
+          console.warn("Falha no proxy, a tentar alternativa...", e);
+        }
+      }
+      throw new Error("Não foi possível aceder ao calendário.");
+    }
+
+    function parseCalendarEvents(icsData, owner) {
+      try {
+        const jcalData = ICAL.parse(icsData);
+        const comp = new ICAL.Component(jcalData);
+        const vevents = comp.getAllSubcomponents('vevent');
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+
+        return vevents.map(v => {
+          const event = new ICAL.Event(v);
+          const start = event.startDate.toJSDate();
+          return {
+            title: event.summary || "Sem título",
+            location: event.location || "",
+            start: start,
+            isAllDay: event.startDate.isDate,
+            owner: owner
+          };
+        }).filter(e => e.start >= now);
+      } catch (err) {
+        console.error("Erro no parser ICAL:", err);
+        return [];
+      }
+    }
+
+    async function fetchEvents() {
+      const enzoUrl = localStorage.getItem('cal_enzo');
+      const marianaUrl = localStorage.getItem('cal_mariana');
+      const listEl = document.getElementById('eventList');
+      const debugBox = document.getElementById('debug-box');
+      const statusEl = document.getElementById('sync-status');
+
+      if (!enzoUrl && !marianaUrl) {
+        listEl.innerHTML = `<div style="color: var(--text-muted); padding: 12px 0;">Clica em ⚙️ no canto superior para inserires os links dos calendários.</div>`;
+        debugBox.innerHTML = `Nenhum calendário configurado.<br>Clica na engrenagem ⚙️ e cola os links .ics.`;
+        return;
+      }
+
+      statusEl.textContent = "A atualizar...";
+      let logs = [];
+      let allEvents = [];
+
+      // Carregar Enzo
+      if (enzoUrl) {
+        try {
+          const ics = await fetchCalendar(enzoUrl);
+          const evs = parseCalendarEvents(ics, 'enzo');
+          allEvents = allEvents.concat(evs);
+          logs.push(`✅ <b>Enzo:</b> ${evs.length} eventos futuros carregados.`);
+        } catch (e) {
+          logs.push(`❌ <b>Enzo:</b> Erro ao carregar link (verifica o URL).`);
+        }
+      }
+
+      // Carregar Mariana
+      if (marianaUrl) {
+        try {
+          const ics = await fetchCalendar(marianaUrl);
+          const evs = parseCalendarEvents(ics, 'mariana');
+          allEvents = allEvents.concat(evs);
+          logs.push(`✅ <b>Mariana:</b> ${evs.length} eventos futuros carregados.`);
+        } catch (e) {
+          logs.push(`❌ <b>Mariana:</b> Erro ao carregar link do iCloud.`);
+        }
+      }
+
+      debugBox.innerHTML = logs.join('<br>') + `<br><br><span style="font-size:0.8rem; color:#64748b;">Última verificação: ${new Date().toLocaleTimeString('pt-PT')}</span>`;
+      statusEl.textContent = `Atualizado às ${new Date().toLocaleTimeString('pt-PT', {hour:'2-digit', minute:'2-digit'})}`;
+
+      allEvents.sort((a, b) => a.start - b.start);
+      const upcoming = allEvents.slice(0, 20);
+
+      if (upcoming.length === 0) {
+        listEl.innerHTML = `<div style="color: var(--text-muted); padding: 12px 0;">Não foram encontrados eventos futuros nos calendários.</div>`;
+        return;
+      }
+
+      listEl.innerHTML = upcoming.map(e => `
+        <div class="event-card ${e.owner}">
+          <div class="event-time">
+            ${e.isAllDay ? 'Dia Inteiro' : e.start.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          <div class="event-details">
+            <div class="event-title">${e.title}</div>
+            <div class="event-sub">
+              ${e.start.toLocaleDateString('pt-PT', { weekday: 'short', day: 'numeric', month: 'short' })}
+              ${e.location ? ' • ' + e.location : ''}
+            </div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Atualiza automaticamente a cada 10 minutos
+    setInterval(fetchEvents, 10 * 60 * 1000);
+    fetchEvents();
+  </script>
+</body>
+</html>
